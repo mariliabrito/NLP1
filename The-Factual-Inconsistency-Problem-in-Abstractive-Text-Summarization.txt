@@ -1,0 +1,535 @@
+                                         The Factual Inconsistency Problem in Abstractive Text Summarization: A Survey
+
+                                                              Yichong Huang , Xiachong Feng , Xiaocheng Feng and Bing Qin
+                                                                Research Center for Social Computing and Information Retrieval
+                                                                            Harbin Institute of Technology, China
+                                                                     {ychuang, xiachongfeng, xcfeng, qinb}@ir.hit.edu.cn,
+arXiv:2104.14839v2 [cs.CL] 10 May 2021
+
+
+
+
+                                                                   Abstract                                      Source Document: The magnitude-4.8 quake struck north
+                                                                                                                 of the city of Lucca, officials said. The tremor was felt as
+                                              Recently, various neural encoder-decoder models
+                                                                                                                 far away as Milan and Florence, Italian media say. There
+                                              pioneered by Seq2Seq framework have been pro-                      were no immediate reports of injuries or damage. Italy is
+                                              posed to achieve the goal of generating more ab-                   prone to earthquakes. In 2009 almost 300 people died in a
+                                              stractive summaries by learning to map input text                  quake in L'Aquila in the central Abruzzo region...
+                                              to output text. At a high level, such neural mod-
+                                              els can freely generate summaries without any con-                 Factually Consistent Summary: An earthquake has shaken
+                                              straint on the words or phrases used. Moreover,                    parts of northern Italy, forcing some residents onto the
+                                              their format is closer to human-edited summaries                   streets.
+                                              and output is more readable and fluent. However,                   Factually Inconsistent Summary: A powerful earthquake
+                                              the neural model’s abstraction ability is a double-                has struck central Italy, killing at least seven people and
+                                              edged sword. A commonly observed problem with                      injuring more than 100.
+                                              the generated summaries is the distortion or fabri-
+                                              cation of factual information in the article. This in-
+                                                                                                            Figure 1: An example of factual inconsistency errors. The facts
+                                              consistency between the original text and the sum-
+                                                                                                            supported by the source document are marked in green. Factual in-
+                                              mary has caused various concerns over its applica-            consistency errors are marked in red.
+                                              bility, and the previous evaluation methods of text
+                                              summarization are not suitable for this issue. In re-
+                                              sponse to the above problems, the current research            instead of simply extracting the important sentences [Gupta,
+                                              direction is predominantly divided into two cate-             2019].
+                                              gories, one is to design fact-aware evaluation met-              With the great strides of deep learning, neural-based ab-
+                                              rics to select outputs without factual inconsistency          stractive summarization models are able to produce fluent and
+                                              errors, and the other is to develop new summariza-            human-readable summaries [See et al., 2017].
+                                              tion systems towards factual consistency. In this
+                                                                                                               However, existing neural abstractive summarization mod-
+                                              survey, we focus on presenting a comprehensive re-
+                                                                                                            els are highly prone to generate factual inconsistency errors.
+                                              view of these fact-specific evaluation methods and
+                                                                                                            It refers to the phenomenon that the summary sometimes dis-
+                                              text summarization models.
+                                                                                                            torts or fabricates the facts in the article. Recent studies show
+                                                                                                            that up to 30% of the summaries generated by abstractive
+                                                                                                            models contain such factual inconsistencies [Kryscinski et
+                                         1   Introduction                                                   al., 2020; Falke et al., 2019]. This brings serious problems
+                                         Text summarization is one of the most important yet challeng-      to the credibility and usability of abstractive summarization
+                                         ing tasks in Natural Language Processing (NLP) field. It aims      systems. Figure 1 demonstrates an example article and ex-
+                                         at condensing a piece of text to a shorter version that contains   cerpts of generated summaries. As shown, “magnitude-4.8
+                                         the main information from the original document [Mani and          earthquake” is exaggerated into a “powerful quake,” which
+                                         Maybury, 1999; Nallapati et al., 2016].                            will cause adverse social impacts.
+                                            Text summarization approaches can be divided into two              On the other hand, most existing summarization evaluation
+                                         categories: extractive and abstractive.                            tools calculate N-gram overlaps between the generated sum-
+                                            Extractive summarization is to find out the most salient        mary and the human-written reference summary as the qual-
+                                         sentences from the text by considering the statistical features    ities of the generated summary, while neglecting fact-level
+                                         and then arranging the extracted sentences to create the sum-      consistency between two texts. Zhu et al. [2020] point that
+                                         mary. Abstractive summarization, on the other hand, is a           the generated summaries are often high in token level metrics
+                                         technique in which the summary is generated by generating          like ROUGE [Lin, 2004] but lack factual correctness. For in-
+                                         novel sentences by either rephrasing or using the new words,       stance, the sentences “I am having vacation in Hawaii.” and “I
+                                                         Factual Consistency
+                                                                                          on          Meta-Evaluation
+                                                               Metrics
+
+
+
+                                       Unsupervised                                      Weakly Supervised
+
+
+                   Triple-based Textual-Entailment-based QA-based Others       Sentence-level Entity-level Token-level
+
+
+                                                Figure 2: Factual consistency metrics.
+
+
+am not having vacation in Hawaii.” share nearly all unigrams         2.2       Factual Inconsistency Error
+and bigrams despite having the opposite meaning.                     Factual inconsistency errors, i.e., facts inconsistent with the
+   To address the factual inconsistency issue, a lot of au-          source document, could be divided into two categories:
+tomatic factual consistency evaluation metrics and meta-                Intrinsic Error: the fact that is contradicted to the source
+evaluation for these metrics are proposed (§3). Besides, much        document, which is also referred to as “intrinsic hallucina-
+effort has been devoted to optimizing factual consistency for        tion” in Maynez et al. [2020]. In Figure 1, the word “central”,
+summarization systems (§4). In the past three years, more            which is contradicted to “north” in the source document, be-
+than twenty studies on factual consistency of summarization          longs to this case.
+have been proposed. Considering the large amount of effort              Extrinsic Error: the fact that is neutral to the source doc-
+dedicated to resolving the factual inconsistency problem and         ument (i.e., the content that is neither supported nor contra-
+the large interest of the NLP community in abstractive sum-          dicted by the source document), which is also referred to as
+marization, in this work we first introduce readers to the field     “extrinsic hallucination”. As shown in Figure 1, “killing at
+of abstractive summarization. Then we focus on the factual           least seven people and injuring more than 100”, which is not
+inconsistency problem by giving a broad overview of fac-             reported in the source document, belongs to this case.
+tual consistency evaluation and factual consistency optimiza-           It is worth mentioning that, existing factual consistency
+tion methods. Throughout this survey, we outline the lessons         optimization methods mainly focus on intrinsic errors, and
+learned from the introduced methods and provide views on             these two categories are not distinguished in factual consis-
+possible future directions.                                          tency evaluation metrics.
+
+2     Background                                                     3     Factual Consistency Metrics
+In this section, we first introduce readers to abstractive sum-      We take the stock of factual consistency metrics, and then di-
+marization methods to better understand the reasons for gen-         vide them into two categories: unsupervised and weakly su-
+erating factual inconsistency errors. Then we give the defini-       pervised, as shown in Figure 2. Unsupervised metrics use
+tion of the factual inconsistency error and the corresponding        existing tools to evaluate factual consistency of summaries.
+category.                                                            According to tools that unsupervised metrics base on, we fur-
+                                                                     ther divide unsupervised metrics into 4 types: Triple-based,
+2.1    Abstractive Summarization methods                             Textual entailment-based, QA-based and Others. Weakly
+Conventional abstractive summarization methods usually ex-           supervised metrics need to train on the factual consistency
+tract some keywords from the source document, and then               data, which consists of documents and model-generated sum-
+reorder and perform linguistically motivated transformations         maries and factual consistency scores for each summaries. To
+to these keywords [Zajic et al., 2004]. However, previous            compare factual consistency metrics with each other, Meta-
+paraphrase-based generation methods are easy to produce in-          evaluations for factual consistency rise up. We introduce 2
+fluent sentences [Hahn and Mani, 2000].                              meta-evaluation works about factual consistency. Besides, we
+   Nallapati et al. [2016] first proposed to use an RNN (i.e.        organize existing metrics into Table 1.
+encoder) to encode the source document into a sequence of
+word vectors, and use another RNN (i.e. decoder) to gen-             3.1       Unsupervised Metrics
+erate a sequence of words as the generated summary based             Triple-based
+on the word vectors from encoder. The encoder and decoder            The most intuitive way to evaluating factual consistency is
+could also be implemented by CNN [Narayan et al., 2018]              to count the fact overlap between generated summary and the
+and Transformer [Vaswani et al., 2017]. The decoder of those         source document, as shown in Figure 3. Facts are usually rep-
+sequence-to-sequence based neural text generation is a condi-        resented by relation triples (subject, relation, object), where
+tional language model, which makes generating readable and           the subject has a relation to the object. To extract triples,
+fluent text possible [Fan et al., 2018]. However, most summa-        Goodrich et al. [2019] first try to use OpenIE tool [Banko et
+rization systems are trained to maximize the log-likelihood          al., 2007]. However, OpenIE extracts triples with an unspec-
+of the reference summary at the word-level, which does not           ified schema instead of a fixed schema. In unspecific schema
+necessarily reward models for being faithful [Maynez et al.,         extraction, relation is extracted from the text between subject
+2020].                                                               and object. In fixed schema extraction, a relation is predicted
+                   Metric                                                            Category       Summarization Dataset               Code
+                   Goodrich et al. [2019]                                         Triple-based                    Wikipedia
+                   Falke et al. [2019]                               Textual-Entailment-based                     CNN/DM
+                   Mishra et al. [2020]                              Textual-Entailment-based                     CNN/DM
+                   QAGS [Wang et al., 2020]                                         QA-based                 CNN/DM, XSum                    X
+                   FEQA [Durmus et al., 2020]                                       QA-based                 CNN/DM, XSum                    X
+                   FactCC [Kryscinski et al., 2020]                  Weakly-Supervised-based                      CNN/DM                     X
+                   HERMAN [Zhao et al., 2020]                        Weakly-Supervised-based                         XSum
+                   Zhou et al. [2020]                                Weakly-Supervised-based                         XSum
+
+    Table 1: List of factual consistency metrics. Code refers whether the code is available. Xlinks to corresponding resource location.
+
+
+             Source document                         Summary                            Source document                              Summary
+
+       Inception is a science
+       fiction film directed by                                                         Inception is a science fiction
+                                               Leonardo directed the                                                           Leonardo directed the science
+       Nolan and starring                                                               film directed by Nolan and
+                                               action film Inception.                                                          fiction film Inception.
+                                                                                        starring Leonardo…
+       Leonardo…
+
+
+           Source Triples                        Summary Triples
+
+                                                                                          Source                 Generated                Summary
+   (Inception, is, science fiction film)     (Inception, is, action film)                Answers                 Questions                Answers
+    (Inception, starring, Leonardo)
+                                                                                                               Who directed
+                                                                                           Nolan                                            Leonardo
+   (Inception, directed by, Nolan)         (Leonardo, directed, Inception)                                     Inception?
+
+                                                                                          Science              What kind of                  Science
+                                                                                          fiction              film is Inception?            fiction
+                              score = 0.5
+
+        Figure 3: Triple-based factual consistency metrics.                                                         score = 0.5
+
+                                                                                            Figure 4: QA-based factual consistency metrics.
+from a pre-defined relations set, which could be viewed as a
+classification task. Unspecific schema extraction makes the
+extracted triples hard to compare with each other. As shown                        dataset to the summarization dataset. Another one is that NLI
+in Example 1, from two sentences expressing the same fact,                         models tend to rely on heuristics such as lexical overlap to
+we will get different triples that mismatch each other.                            explain the high entailment probability. As a consequence,
+                                                                                   existing NLI models generalize poorly in downstream tasks.
+Example 1 (Relation Extraction with Unspecific Schema).                               To make NLI models more generalizable, Mishra et
+source document: “Obama was born in Hawaii” ⇒                                      al. [2020] first conjecture that a key difference between the
+(Obama, born in, Hawaii)                                                           NLI datasets and downstream tasks concerns the length of
+summary: “Hawaii is the birthplace of Obama” ⇒ (Hawaii,                            the premise. Specifically, most existing NLI datasets consider
+is the birthplace of, Obama).                                                      one or at most a few sentences as the premise. However, most
+   To resolve this problem, Goodrich et al. [2019] change to                       downstream NLP tasks such as text summarization and ques-
+use relation extraction tools with fixed schema. Considering                       tion answering consider the longer text as the premise, which
+still the two sentences in Example 1, whether extracting from                      requires reasoning over longer text. Reasoning over longer
+the source document or the summary, the extracted triples are                      text needs a multitude of additional abilities like coreference
+(Hawaii, is the birthplace of, Obama) in fixed schema extrac-                      resolution and abductive reasoning. To bridge this gap, they
+tion. This helps extracted triples easier to compare.                              next create new long premise NLI datasets out of existing QA
+                                                                                   datasets for training a truly generalizable NLI model. After
+Textual-Entailment-based                                                           training on this new NLI dataset, the model gains significant
+Following the idea that a factually consistent summary is                          improvement in the factual consistency evaluation task.
+semantically entailed by the source document, Falke et
+al. [2019] propose to use textual entailment prediction tools                      QA-based
+to evaluate the factual consistency for a summary. Textual                         Inspired by other question answering (QA) based automatic
+entailment prediction, also known as Natural Language In-                          metrics in text summarization, Wang et al.; Durmus et
+ference (NLI), aims at detecting whether a text P (Premise)                        al. [2020; 2020] propose QA based factual consistency evalu-
+could entail another text H (Hypothesis). However, out-of-                         ation metrics QAGS and FEQA separately. These two metrics
+the-box entailment models do not yet offer the desired per-                        are all based on the intuition that if we ask questions about a
+formance for factual consistency evaluation in text summa-                         summary and its source document, we will receive similar an-
+rization. One reason is that the domain shift from the NLI                         swers if the summary is factually consistent with the source
+document. As illustrated in Figure 4, they are all consist of      through a set of textual transformations that output novel sen-
+three steps: (1) Given a generated summary, a question gener-      tences with pseudo positive or negative labels. The positive
+ation (QG) model generates a set of questions about the sum-       examples are obtained through semantically invariant trans-
+mary, standard answers of which are named entities and key         formations like paraphrasing. The negative examples are ob-
+phrases in the summary. (2) Then using question answering          tained through semantically variant transformations like sen-
+(QA) model to answers these questions given the source doc-        tence negation and entity swap. In the test stage, FactCC
+ument. (3) A factual consistency score is computed based on        takes the source document and a summary sentence as input
+the similarity of corresponding answers. Because evaluating        and outputs the factual consistency label for this summary
+factual consistency at entity-level, these methods are more in-    sentence. By simulating different kinds of factual inconsis-
+terpretable than textual-entailment-based methods. The read-       tency errors, this method gains some performance improve-
+ing comprehension ability of QG and QA models brings these         ment in factual consistency evaluation. But at the same time,
+methods promising performance in this task. However, these         this rule-based dataset construction method brings a perfor-
+approaches are computationally expensive.                          mance bottleneck. Because it is hard to simulate all types of
+                                                                   factual inconsistency errors.
+Other Methods
+Besides the above methods specially designed, there are also       Entity-level
+several simple but effective methods to evaluate factual con-        Zhao et al. [2020] propose HERMAN, which focuses on
+sistency, which are usually used as baselines. Durmus et           evaluating factual consistency of quantity entities (e.g. num-
+al. [2020] propose that a straightforward metric for factual       bers, dates, etc). HERMAN bases on sequence labeling ar-
+consistency is the word overlap or semantic similarity be-         chitecture, in which input is the source document and sum-
+tween the summary sentence and the source document. The            mary, the output is a sequence of labels indicating which to-
+word overlap-based metrics compute ROUGE [Lin, 2004],              kens consist of factual inconsistent quantity entities. The syn-
+BLEU [Papineni et al., 2002], between the output summary           thetic training data for HERMAN is automatically generated
+sentence and each source sentence. And then taking the aver-       from the summarization dataset XSum [Narayan et al., 2018].
+age score or maximum score across all the source sentences.        Rather than sampling document sentences as claims, Zhao
+The semantic similarity-based metric is similar to word            et al. [2020] use reference summary as claims. And these
+overlap-based methods. Instead of using ROUGE or BLEU,             claims are directly labeled as positive summaries. The nega-
+this method uses BERTScore [Zhang* et al., 2020a]. These           tive summaries are obtained by replacing the quantity entities
+two types of methods show a baseline level of effectiveness.       in positive summaries.
+And experiments in Durmus et al. [2020] show that word             Token-level
+overlap-based methods work better in lowly abstractive sum-         Zhou et al. [2020] propose to evaluate factual consistency on
+marization datasets like CNN/DM [Hermann et al., 2015],            token-level, which is more fine-grained and more explainable
+semantic similarity-based method works better in highly ab-        than sentence-level and entity-level evaluation. This token-
+stractive summarization datasets like XSum [Narayan et al.,        level metric is implemented by fine-tuning pre-trained lan-
+2018]. Abstractiveness of the summarization dataset means          guage model. Like Zhao et al. [2020], reference summaries
+the extent how abstract the reference summaries are against        are also directly labeled as positive examples, and the nega-
+the source documents. Extremely, the summarization dataset         tive examples are obtained by reconstructing part of reference
+is the least abstractive if all the reference summaries of which   summaries. This method shows higher correlations with hu-
+are directly extracted from the source document.                   man factual consistency evaluation.
+                                                                      These weakly supervised metrics attract much attention
+3.2   Weakly Supervised Metrics                                    recently. But they still needs a large amount of human-
+Weakly supervised metrics design models specially for eval-        annotated data (the source documents, model-generated sum-
+uating factual consistency. And these models are trained           maries, and the factual consistency label for each summary)
+on synthetic data that are generated from the summariza-           to achieve higher performance. However, such data are ex-
+tion dataset automatically, which side-steps the scarcity of       ceedingly expensive to produce in terms of both money and
+the training data. According to objects to evaluated, exist-       time. While existing weakly supervised methods automat-
+ing metrics are divided into three categories: sentence-level,     ically generate training data with heuristic, they use either
+entity-level, and token-level.                                     document sentences or reference summaries to construct pos-
+                                                                   itive and negative examples. Nevertheless, both of them are
+Sentence-level                                                     different from summaries generated by summarization mod-
+Kryscinski et al. [2020] propose FactCC, a model to ver-           els. So although existing model-based methods show effec-
+ify the factual consistency for a summary sentence given           tiveness in the training dataset, when applied in the real fac-
+its source document. FactCC is implemented by fine-tuning          tual consistency evaluation scenario, the effect is very limited.
+pre-trained language model BERT [Devlin et al., 2019] as
+a binary classifier. And they further propose to automati-         3.3   Meta Evaluation
+cally generate synthetic training data from the summarization      To verify the effectiveness of the above factual consistency
+dataset CNN/DM [Hermann et al., 2015]. Training examples           metrics, most related works usually report the correlation be-
+are created by first sampling single sentences, later referred     tween their own metric and human-annotated factual consis-
+to as claims, from the source documents. Claims then pass          tency score. However, it is still hard to compare each metric
+                                                        Factual Consistency
+                                                           Optimization
+
+
+
+                     Fact-Encode-based         Textual-Entailment-based        Post-Editing-based       Others
+
+
+                                         Figure 5: Factual consistency optimization methods.
+
+
+by the correlations as the diversity of annotating settings in      sequential fact encode
+different works and the disagreement among different annota-        Cao et al. [2018] introduce FTSum, which consists of two
+tor groups. To measure the effectiveness of different kinds of      RNN encoders and one RNN decoder. FTSum concatenates
+factual consistency metrics, Gabriel et al.; Koto et al. [2020;     the facts in the source document into a string which is named
+2020] conduct meta-evaluations of factual consistency in            fact description. One encoder encodes the source document
+summarization. They evaluate the quality of several factual         and another encoder encodes the fact description. The de-
+consistency metrics by computing the correlation between            coder attends the outputs from these two encoders when gen-
+scores given by these metrics and scores measured by the            erating the summary. Even though experimental results show
+same group of annotators.                                           that FTSum reduces significantly factual inconsistent errors,
+   Through meta-evaluation, Koto et al. [2020] find that            it is hard for FTSum to capture the interactions between enti-
+the semantic similarity-based method could reach state-             ties in all facts.
+of-the-art performance for factual consistency evaluation
+by searching optimal model parameters (i.e. model layers            graph-based fact encode
+of pre-trained language model in BERTScore) in highly ab-           To resolve this issue, Zhu et al.; Huang et al. [2020;
+stractive summarization dataset XSum [Narayan et al., 2018].        2020] propose to model the facts in the source document
+Even so, the correlation with human evaluation is not more          with knowledge graphs. FASum (Fact-Aware Summariza-
+than 0.5. Therefore, factual consistency evaluation is still        tion) [Zhu et al., 2020], a transformer-based summariza-
+an open issue in exploration.                                       tion model, uses a graph neural network (GNN) to learn
+                                                                    the representation of each node (i.e., entities and relations)
+4     Factual Consistency Optimization                              and fuses them into the summarization model. Comparing
+In this section, we provide an overview of approaches to            with FASum, ASGARD (Abstractive Summarization with
+optimizing summarization systems towards factual consis-            Graph Augmentation and semantic-driven RewarD) Huang
+tency. As illustrated in Figure 5, we divide existing meth-         et al. [2020] further uses multiple choice cloze reward to drive
+ods roughly into 4 classes according to principles that each        the model to acquire semantic understanding over the input.
+method bases on: fact encode-based, textual entailment-                In addition to enhancing the representation of facts in the
+based, post-editing-based, and other methods. Besides, we           source document, incorporating commonsense knowledge is
+organize these methods into Table 2.                                also useful to facilitate summarization systems understand-
+                                                                    ing the facts. Therefore, Gunel et al. [2019] sample relation
+4.1    Fact-Encode-based                                            triples from Wikidata to construct a commonsense knowledge
+In the earliest research about factual consistency, most works      graph. In this knowledge graph, TransE [Bordes et al., 2013],
+mainly focus on intrinsic factual inconsistency errors, i.e.,       the popular multi-relational data modeling method, is used to
+the fact that is inconsistent with the source document. In-         learn entity embeddings. And the summarization system at-
+trinsic factual inconsistency errors convey wrongly the fact        tends to the embedding of related entities when encoding the
+of the source document, which usually manifests as cross-           source document. In this way, commonsense knowledge is
+combinations of the semantic units in different facts. For ex-      incorporated into the summarization systems.
+ample, “Jenny likes dancing. Bob likes playing football.” ⇒
+“Jenny likes playing football”. It is the root cause for in-        4.2    Textual-Entailment-based
+trinsic errors that models misunderstand facts in the source        Following the idea that a factual consistent summary is se-
+document.                                                           mantically entailed by the source document, [Li et al.,
+   To help summarization systems understand correctly the           2018] propose an entailment-aware summarization model,
+facts, the most intuitive method is to explicitly model the         which aims at incorporating entailment knowledge into the
+facts in the source document, to augment the representation         summarization model. Specifically, they propose a pair
+of facts. Following this idea, fact encode-based methods first      of entailment-aware encoder and decoder. The entailment-
+extract facts in the source document, which are usually repre-      aware encoder is used to learn simultaneously summary
+sented by relation triples consisting of (subject; relation; ob-    generation and textual entailment prediction. And the
+ject). Then, these methods additionally encode the extracted        entailment-aware decoder is implemented by entailment Re-
+facts into summarization models. According to the ways to           ward Augmented Maximum Likelihood (RAML) training.
+encoding facts, these methods are divided into two categories:      RAML [Norouzi et al., 2016] provides a computationally ef-
+sequential encode and graph-based encode.                           ficient approach to optimizing task-specific reward (loss) di-
+         Model                                                  Category                     Summarization Dataset        Code
+         FTSum [Cao et al., 2018]                   Fact-Encode-based                                Gigaword
+         FASum [Zhu et al., 2020]                   Fact-Encode-based                          CNN/DM, XSum
+         ASGARD [Huang et al., 2020]                Fact-Encode-based                            CNN/DM, NYT                X
+         Gunel et al. [2019]                        Fact-Encode-based                                CNN/DM
+         Li et al. [2018]                     Textual-Entailment-based                               Gigaword               X
+         SpanFact [Dong et al., 2020]               Post-Editing-based               CNN/DM, XSum, Gigaword
+         Cao et al. [2020]                          Post-Editing-based                               CNN/DM
+         Matsumaru et al. [2020]                                 Other                       Gigaword, JAMUL
+         Mao et al. [2020]                                       Other                         CNN/DM, XSum
+         Zhang et al. [2020b]                                    Other          Radiology Reports Summarization             X
+         Yuan et al. [2020]                                      Other        E-commerce Product Summarization              X
+
+                  Table 2: List of factual consistency optimization methods. Xlinks to corresponding resource location.
+
+
+rectly. In this model, the reward is the entailment score of          limits the performance of post-editing-based methods for the
+generated summary.                                                    reason that corrupted reference summaries have a different
+                                                                      data distribution with the model-generated summaries, which
+4.3   Post-Editing-based                                              is the same as weakly supervised factual consistency metrics
+The above two kinds of methods optimize summarization                 (§3.2).
+systems towards factual consistency by modifying model                4.4    Other
+structures. Different from those methods, post-editing-based
+methods enhance factual consistency of the final summary              Apart from the above methods, there are several simple but
+by post-editing the model-generated summaries which are               useful methods and domain-specific methods.
+viewed as draft summaries using fact corrects. Fact cor-                  Matsumaru et al. [2020] conjecture that one of the rea-
+rectors take the source document and draft summary as input           sons why the model sometimes generates factually inconsis-
+and generates the corrected summary as the final summary.             tent summaries lies in unfaithful document-summary pairs,
+   Inspired by the QA span selection task, Dong et al. [2020]         which are used for training the model. To mitigate this issue,
+propose SpanFact, a suite of two span selection-based fact            they further propose to filter inconsistent training examples
+correctors, which corrects the entities in the draft summary          with a textual entailment classifier.
+in an iterative or auto-regressive manner respectively. Be-               Mao et al. [2020] propose to improve factual consistency
+fore performing fact correcting, one or all entities (one in the      by applying constraints during the inference stage (i.e., beam
+iterative manner, all in the auto-regressive manner) will be          search stage). Specifically, summarization models could end
+masked. Then SpanFact selects spans in the source docu-               decoding only when all the constraints are met. And the con-
+ment to replace corresponding mask tokens based on the un-            straints are important entities and keyphrases. Because this
+derstanding of the source document.                                   method only works at the inference stage as a plug-and-play
+   To train SpanFact, [Dong et al., 2020] construct the dataset       module, it could be integrated into any abstractive summa-
+automatically.                                                        rization model without modifying its internal structure. How-
+   Human evaluation results shown that SpanFact success-              ever, how much improvement of factual consistency could be
+fully corrects about 26% factually inconsistent summaries             achieved by this method and how to design more useful con-
+and wrongly corrupts less than 1% factually consistent sum-           straints are still questions to explore.
+maries. However, SpanFact is limited to correct entity errors.           Comparing to relatively open domain summarization, such
+                                                                      as news field, optimization approaches towards factual con-
+   Simpler than SpanFact, Cao et al. [2020] propose an End-
+                                                                      sistency in special field are more different for their field char-
+to-End fact corrector, which can correct more types of errors.
+                                                                      acters. In the medical field, Zhang et al. [2020b] propose to
+This End-to-End fact corrector is implemented by fine-tuning
+                                                                      optimize the factual consistency of radiology reports summa-
+pre-trained language model BART [Lewis et al., 2020] with
+                                                                      rization. Shah et al. [2021] propose to optimize the factual
+artificial data. It takes and corrupted summary as input. The
+                                                                      consistency of health and nutrition summarization.
+output is the corrected summary. Even though this method
+                                                                         In e-commerce field, Yuan et al. [2020] propose to opti-
+could correct more factually inconsistent errors than Span-
+                                                                      mize the factual consistency of e-commerce product summa-
+Fact conceptually, it has not outperform SpanFact in human
+                                                                      rization.
+evaluation result.
+   Both of Dong et al. [2020] and Cao et al. [2020] choose
+to construct artificial training data automatically instead of        5     Conclusion and Future Directions
+using expensive human annotation.                                     In this paper, we first introduce the factual inconsistency
+   However, the gap between the training stage (which learns          problem in abstractive summarization. Then we provide an
+to correct the corrupted reference summaries) and the testing         overview of approaches to evaluating and improving the fac-
+stage (which aims to correct the model-generated summaries)           tual consistency of summarization systems. Considering the
+landscape that we paint in this paper, we foresee the following      2020 Conference on Empirical Methods in Natural Lan-
+directions:                                                          guage Processing (EMNLP), pages 6251–6258, Online,
+ 1. Optimization for Extrinsic Errors. The existing fac-             November 2020. Association for Computational Linguis-
+    tual consistency optimizations methods mainly focus on           tics.
+    intrinsic errors, while ignoring extrinsic errors. We ar-     [Devlin et al., 2019] Jacob Devlin, Ming-Wei Chang, Ken-
+    gue that the main reason for the extrinsic factual incon-        ton Lee, and Kristina Toutanova. BERT: Pre-training of
+    sistency errors is that the current maximum likelihood           deep bidirectional transformers for language understand-
+    estimation training strategy cannot explicitly model the         ing. In Proceedings of the 2019 Conference of the North
+    hard constraints between the document and the summary            American Chapter of the Association for Computational
+    (e.g., the entities and quotations must appear in the docu-      Linguistics: Human Language Technologies, Volume 1
+    ment). How to model these constraints into the summary           (Long and Short Papers), pages 4171–4186, Minneapo-
+    generation process is a problem worth exploring. And             lis, Minnesota, June 2019. Association for Computational
+    reinforcement learning may be a feasible way to achieve          Linguistics.
+    this goal.                                                    [Dong et al., 2020] Yue Dong, Shuohang Wang, Zhe Gan,
+ 2. Paragraph-level Metrics. Most evaluation works fo-               Yu Cheng, Jackie Chi Kit Cheung, and Jingjing Liu. Multi-
+    cus on calculating sentence-level factual consistency            fact correction in abstractive text summarization. In Pro-
+    without considering the relationship between sentences.          ceedings of the 2020 Conference on Empirical Methods
+    Paragraph-level evaluation is more challenging and               in Natural Language Processing (EMNLP), pages 9320–
+    valuable.                                                        9331, Online, November 2020. Association for Computa-
+ 3. Factual Consistency in other Conditional Text Gen-               tional Linguistics.
+    eration. Besides the standard text summarization task,        [Durmus et al., 2020] Esin Durmus, He He, and Mona Diab.
+    other conditional text generation tasks such as image            FEQA: A question answering evaluation framework for
+    captioning and visual storytelling also suffer factual in-       faithfulness assessment in abstractive summarization. In
+    consistency errors and cross-modal factual consistency           Proceedings of the 58th Annual Meeting of the Association
+    is more challenging than single-text.                            for Computational Linguistics, pages 5055–5070, Online,
+The above-mentioned research directions are by no means ex-          July 2020. Association for Computational Linguistics.
+haustive and are to be considered as guidelines for researchers   [Falke et al., 2019] Tobias Falke, Leonardo F. R. Ribeiro,
+wishing to address the factual inconsistency problem in ab-          Prasetya Ajie Utama, Ido Dagan, and Iryna Gurevych.
+stractive summarization.                                             Ranking generated summaries by correctness: An inter-
+                                                                     esting but challenging application for natural language in-
+References                                                           ference. In Proceedings of the 57th Annual Meeting of the
+                                                                     Association for Computational Linguistics, pages 2214–
+[Banko et al., 2007] Michele Banko, Michael J. Cafarella,            2220, Florence, Italy, July 2019. Association for Compu-
+  Stephen Soderland, Matt Broadhead, and Oren Etzioni.               tational Linguistics.
+  Open information extraction from the web. In Proceed-
+  ings of the 20th International Joint Conference on Artifical    [Fan et al., 2018] Angela Fan, Mike Lewis, and Yann
+  Intelligence, IJCAI’07, page 2670–2676, San Francisco,             Dauphin. Hierarchical neural story generation. In Pro-
+  CA, USA, 2007. Morgan Kaufmann Publishers Inc.                     ceedings of the 56th Annual Meeting of the Association
+                                                                     for Computational Linguistics (Volume 1: Long Papers),
+[Bordes et al., 2013] Antoine Bordes, Nicolas Usunier,               July 2018.
+  Alberto Garcia-Durán, Jason Weston, and Oksana
+  Yakhnenko. Translating embeddings for modeling multi-           [Gabriel et al., 2020] Saadia Gabriel, Asli Celikyilmaz,
+  relational data. In Proceedings of the 26th International          Rahul Jha, Yejin Choi, and Jianfeng Gao. Go figure! a
+  Conference on Neural Information Processing Systems                meta evaluation of factuality in summarization, 2020.
+  - Volume 2, NIPS’13, page 2787–2795, Red Hook, NY,              [Goodrich et al., 2019] Ben Goodrich, Vinay Rao, Moham-
+  USA, 2013. Curran Associates Inc.                                  mad Saleh, and Peter J. Liu. Assessing the factual ac-
+[Cao et al., 2018] Ziqiang Cao, Furu Wei, Wenjie Li, and Su-         curacy of generated text. Proceedings of the 25th ACM
+  jian Li. Faithful to the original: Fact aware neural ab-           SIGKDD International Conference on Knowledge Discov-
+  stractive summarization. In Proceedings of the Thirty-             ery and Data Mining, 2019.
+  Second AAAI Conference on Artificial Intelligence, (AAAI-       [Gunel et al., 2019] Beliz Gunel, Chenguang Zhu, Michael
+  18), the 30th innovative Applications of Artificial Intel-         Zeng, and Xuedong Huang. Mind the facts: Knowledge-
+  ligence (IAAI-18), and the 8th AAAI Symposium on Ed-               boosted coherent abstractive text summarization. In
+  ucational Advances in Artificial Intelligence (EAAI-18),           NeurIPS 2019, Knowledge Representation and Reasoning
+  New Orleans, Louisiana, USA, February 2-7, 2018, pages             Meets Machine Learning(KR2ML) Workshop, December
+  4784–4791, 2018.                                                   2019.
+[Cao et al., 2020] Meng Cao, Yue Dong, Jiapeng Wu, and            [Gupta, 2019] Som Gupta. Abstractive summarization: An
+  Jackie Chi Kit Cheung. Factual error correction for ab-            overview of the state of the art. Expert Systems with Ap-
+  stractive summarization models. In Proceedings of the              plications, 121:49–65, 2019.
+[Hahn and Mani, 2000] U. Hahn and I. Mani. The challenges      [Maynez et al., 2020] Joshua Maynez, Shashi Narayan,
+  of automatic summarization. Computer, 2000.                     Bernd Bohnet, and Ryan McDonald. On faithfulness and
+[Hermann et al., 2015] Karl Moritz Hermann, Tomas Ko-             factuality in abstractive summarization. In Proceedings of
+                                                                  the 58th Annual Meeting of the Association for Computa-
+  cisky, Edward Grefenstette, Lasse Espeholt, Will Kay,
+                                                                  tional Linguistics, pages 1906–1919, Online, July 2020.
+  Mustafa Suleyman, and Phil Blunsom. Teaching machines
+                                                                  Association for Computational Linguistics.
+  to read and comprehend. NIPS, 2015.
+                                                               [Mishra et al., 2020] Anshuman Mishra, Dhruvesh Patel,
+[Huang et al., 2020] Luyang Huang, Lingfei Wu, and
+                                                                  Aparna Vijayakumar, Xiang Li, Pavan Kapanipathi, and
+  Lu Wang. Knowledge graph-augmented abstractive sum-             Kartik Talamadupula. Looking beyond sentence-level
+  marization with semantic-driven cloze reward. In Pro-           natural language inference for downstream tasks. arXiv
+  ceedings of the 58th Annual Meeting of the Association          preprint arXiv:2009.09099, 2020.
+  for Computational Linguistics, pages 5094–5107, Online,
+  July 2020. Association for Computational Linguistics.        [Nallapati et al., 2016] Ramesh Nallapati, Bowen Zhou,
+                                                                  C. D. Santos, Çaglar Gülçehre, and Bing Xiang. Abstrac-
+[Koto et al., 2020] Fajri Koto, Jey Han Lau, and Timothy          tive text summarization using sequence-to-sequence rnns
+  Baldwin. Ffci: A framework for interpretable automatic          and beyond. In CoNLL, 2016.
+  evaluation of summarization, 2020.
+                                                               [Narayan et al., 2018] Shashi Narayan, Shay B. Cohen, and
+[Kryscinski et al., 2020] Wojciech Kryscinski, Bryan Mc-          Mirella Lapata. Don’t give me the details, just the sum-
+  Cann, Caiming Xiong, and Richard Socher. Evaluat-               mary! topic-aware convolutional neural networks for ex-
+  ing the factual consistency of abstractive text summariza-      treme summarization. In Proceedings of the 2018 Con-
+  tion. In Proceedings of the 2020 Conference on Empiri-          ference on Empirical Methods in Natural Language Pro-
+  cal Methods in Natural Language Processing (EMNLP),             cessing, pages 1797–1807, Brussels, Belgium, October-
+  pages 9332–9346, Online, November 2020. Association             November 2018. Association for Computational Linguis-
+  for Computational Linguistics.                                  tics.
+[Lewis et al., 2020] Mike Lewis, Yinhan Liu, Naman Goyal,      [Norouzi et al., 2016] Mohammad Norouzi, Samy Bengio,
+   Marjan Ghazvininejad, Abdelrahman Mohamed, Omer                Navdeep Jaitly, Mike Schuster, Yonghui Wu, Dale Schu-
+   Levy, Veselin Stoyanov, and Luke Zettlemoyer. BART:            urmans, et al. Reward augmented maximum likelihood for
+   Denoising sequence-to-sequence pre-training for natural        neural structured prediction. Advances In Neural Informa-
+   language generation, translation, and comprehension. In        tion Processing Systems, 29:1723–1731, 2016.
+   Proceedings of the 58th Annual Meeting of the Association   [Papineni et al., 2002] Kishore Papineni, Salim Roukos,
+   for Computational Linguistics, pages 7871–7880, Online,
+                                                                  Todd Ward, and Wei-Jing Zhu. Bleu: a method for au-
+   July 2020. Association for Computational Linguistics.
+                                                                  tomatic evaluation of machine translation. In ACL, pages
+[Li et al., 2018] Haoran Li, Junnan Zhu, Jiajun Zhang, and        311–318, 2002.
+   Chengqing Zong. Ensure the correctness of the sum-          [See et al., 2017] Abigail See, Peter J. Liu, and Christo-
+   mary: Incorporate entailment knowledge into abstractive        pher D. Manning. Get to the point: Summarization with
+   sentence summarization. In Proceedings of the 27th Inter-      pointer-generator networks. In Proceedings of the 55th
+   national Conference on Computational Linguistics, pages        Annual Meeting of the Association for Computational Lin-
+   1430–1441, Santa Fe, New Mexico, USA, August 2018.             guistics (Volume 1: Long Papers), pages 1073–1083, Van-
+   Association for Computational Linguistics.                     couver, Canada, July 2017. Association for Computational
+[Lin, 2004] Chin-Yew Lin. ROUGE: A package for auto-              Linguistics.
+   matic evaluation of summaries. In Text Summarization        [Shah et al., 2021] Darsh J Shah, Lili Yu, Tao Lei, and
+   Branches Out, pages 74–81, Barcelona, Spain, July 2004.        Regina Barzilay. Nutri-bullets: Summarizing health stud-
+   Association for Computational Linguistics.                     ies by composing segments, 2021.
+[Mani and Maybury, 1999] Inderjeet Mani and T. Mark            [Vaswani et al., 2017] Ashish Vaswani, Noam Shazeer, Niki
+  Maybury. Advances in automatic text summarization. Ad-          Parmar, Jakob Uszkoreit, Llion Jones, Aidan N Gomez,
+  vances in Automatic Text Summarization, 1999.                   Łukasz Kaiser, and Illia Polosukhin. Attention is all you
+[Mao et al., 2020] Yuning Mao, Xiang Ren, Heng Ji, and Ji-        need. In Advances in neural information processing sys-
+  awei Han. Constrained abstractive summarization: Pre-           tems, pages 5998–6008, 2017.
+  serving factual consistency with constrained generation,     [Wang et al., 2020] Alex Wang, Kyunghyun Cho, and Mike
+  2020.                                                           Lewis. Asking and answering questions to evaluate the
+[Matsumaru et al., 2020] Kazuki Matsumaru, Sho Takase,            factual consistency of summaries. In Proceedings of the
+  and Naoaki Okazaki. Improving truthfulness of headline          58th Annual Meeting of the Association for Computational
+  generation. In Proceedings of the 58th Annual Meeting           Linguistics, pages 5008–5020, Online, July 2020. Associ-
+  of the Association for Computational Linguistics, pages         ation for Computational Linguistics.
+  1335–1346, Online, July 2020. Association for Compu-         [Yuan et al., 2020] Peng Yuan, Haoran Li, Song Xu,
+  tational Linguistics.                                           Youzheng Wu, Xiaodong He, and Bowen Zhou. On
+  the faithfulness for E-commerce product summarization.
+  In Proceedings of the 28th International Conference on
+  Computational Linguistics, pages 5712–5717, Barcelona,
+  Spain (Online), December 2020. International Committee
+  on Computational Linguistics.
+[Zajic et al., 2004] David Zajic, Bonnie J Dorr, and
+  R. Schwartz. Bbn/umd at duc-2004: Topiary. HLT-
+  NAACL, 2004.
+[Zhang* et al., 2020a] Tianyi Zhang*, Varsha Kishore*, Fe-
+  lix Wu*, Kilian Q. Weinberger, and Yoav Artzi. Bertscore:
+  Evaluating text generation with bert. In International Con-
+  ference on Learning Representations, 2020.
+[Zhang et al., 2020b] Yuhao Zhang, Derek Merck, Emily
+  Tsai, Christopher D. Manning, and Curtis Langlotz. Op-
+  timizing the factual correctness of a summary: A study of
+  summarizing radiology reports. In Proceedings of the 58th
+  Annual Meeting of the Association for Computational Lin-
+  guistics, pages 5108–5120, Online, July 2020. Association
+  for Computational Linguistics.
+[Zhao et al., 2020] Zheng Zhao, Shay B. Cohen, and Bonnie
+  Webber. Reducing quantity hallucinations in abstractive
+  summarization. In Findings of the Association for Com-
+  putational Linguistics: EMNLP 2020, pages 2237–2249,
+  Online, November 2020. Association for Computational
+  Linguistics.
+[Zhou et al., 2020] Chunting Zhou, Jiatao Gu, Mona Diab,
+  Paco Guzman, Luke Zettlemoyer, and Marjan Ghazvinine-
+  jad. Detecting hallucinated content in conditional neural
+  sequence generation. arXiv preprint arXiv:2011.02593,
+  2020.
+[Zhu et al., 2020] Chenguang Zhu, William Hinthorn,
+  Ruochen Xu, Qingkai Zeng, Michael Zeng, Xuedong
+  Huang, and Meng Jiang. Boosting factual correctness of
+  abstractive summarization with knowledge graph, 2020.
+
