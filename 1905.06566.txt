@@ -1,0 +1,710 @@
+                                             HIBERT: Document Level Pre-training of Hierarchical Bidirectional
+                                                      Transformers for Document Summarization
+
+                                                                   Xingxing Zhang, Furu Wei and Ming Zhou
+                                                                     Microsoft Research Asia, Beijing, China
+                                                                {xizhang,fuwei,mingzhou}@microsoft.com
+
+
+
+
+                                                              Abstract                         Hatzivassiloglou, 2004a). Based on these sparse
+                                             Neural extractive summarization models usu-       features, sentence are selected using a classifier or
+                                                                                               a regression model. Later, the feature engineering
+arXiv:1905.06566v1 [cs.CL] 16 May 2019
+
+
+
+
+                                             ally employ a hierarchical encoder for doc-
+                                             ument encoding and they are trained us-           part in this paradigm is replaced with neural net-
+                                             ing sentence-level labels, which are created      works. Cheng and Lapata (2016) propose a hierar-
+                                             heuristically using rule-based methods. Train-    chical long short-term memory network (LSTM;
+                                             ing the hierarchical encoder with these inac-     Hochreiter and Schmidhuber 1997) to encode a
+                                             curate labels is challenging. Inspired by the
+                                                                                               document and then use another LSTM to predict
+                                             recent work on pre-training transformer sen-
+                                             tence encoders (Devlin et al., 2018), we pro-
+                                                                                               binary labels for each sentence in the document.
+                                             pose H IBERT (as shorthand for HIerachical        This architecture is widely adopted recently (Nal-
+                                             Bidirectional Encoder Representations from        lapati et al., 2017; Narayan et al., 2018; Zhang
+                                             Transformers) for document encoding and a         et al., 2018). Our model also employs a hierarchi-
+                                             method to pre-train it using unlabeled data. We   cal document encoder, but we adopt a hierarchical
+                                             apply the pre-trained H IBERT to our summa-       transformer (Vaswani et al., 2017) rather a hier-
+                                             rization model and it outperforms its randomly    archical LSTM. Because recent studies (Vaswani
+                                             initialized counterpart by 1.25 ROUGE on the
+                                                                                               et al., 2017; Devlin et al., 2018) show the trans-
+                                             CNN/Dailymail dataset and by 2.0 ROUGE
+                                             on a version of New York Times dataset. We        former model performs better than LSTM in many
+                                             also achieve the state-of-the-art performance     tasks.
+                                             on these two datasets.                               Abstractive models do not attract much atten-
+                                                                                               tion until recently. They are mostly based on se-
+                                         1   Introduction
+                                                                                               quence to sequence (seq2seq) models (Bahdanau
+                                         Automatic document summarization is the task of       et al., 2015), where a document is viewed a se-
+                                         rewriting a document into its shorter form while      quence and its summary is viewed as another se-
+                                         still retaining its important content. Over the       quence. Although seq2seq based summarizers
+                                         years, many paradigms for document summariza-         can be equipped with copy mechanism (Gu et al.,
+                                         tion have been explored (see Nenkova and McK-         2016; See et al., 2017), coverage model (See et al.,
+                                         eown (2011) for an overview). The most popular        2017) and reinforcement learning (Paulus et al.,
+                                         two among them are extractive approaches and ab-      2017), there is still no guarantee that the generated
+                                         stractive approaches. As the name implies, extrac-    summaries are grammatical and convey the same
+                                         tive approaches generate summaries by extract-        meaning as the original document does. It seems
+                                         ing parts of the original document (usually sen-      that extractive models are more reliable than their
+                                         tences), while abstractive methods may generate       abstractive counterparts.
+                                         new words or phrases which are not in the original       However, extractive models require sentence
+                                         document.                                             level labels, which are usually not included in
+                                            Extractive summarization is usually modeled        most summarization datasets (most datasets only
+                                         as a sentence ranking problem with length con-        contain document-summary pairs). Sentence la-
+                                         straints (e.g., max number of words or sentences).    bels are usually obtained by rule-based methods
+                                         Top ranked sentences (under constraints) are se-      (e.g., maximizing the ROUGE score between a set
+                                         lected as summaries. Early attempts mostly lever-     of sentences and reference summaries) and may
+                                         age manually engineered features (Filatova and        not be accurate. Extractive models proposed re-
+cently (Cheng and Lapata, 2016; Nallapati et al.,       and the sequence labeling (or classification) model
+2017) employ hierarchical document encoders and         is replaced with an LSTM decoder (Cheng and
+even have neural decoders, which are complex.           Lapata, 2016; Nallapati et al., 2017). The ar-
+Training such complex neural models with inac-          chitecture is widely adopted in recent neural ex-
+curate binary labels is challenging. We observed        tractive models and is extended with reinforce-
+in our initial experiments on one of our dataset        ment learning (Narayan et al., 2018; Dong et al.,
+that our extractive model (see Section 3.3 for de-      2018), latent variable models (Zhang et al., 2018),
+tails) overfits to the training set quickly after the   joint scoring (Zhou et al., 2018) and iterative doc-
+second epoch, which indicates the training set          ument representation (Chen et al., 2018). Re-
+may not be fully utilized. Inspired by the recent       cently, transformer networks (Vaswani et al.,
+pre-training work in natural language processing        2017) achieves good performance in machine
+(Peters et al., 2018; Radford et al., 2018; Devlin      translation (Vaswani et al., 2017) and a range of
+et al., 2018), our solution to this problem is to       NLP tasks (Devlin et al., 2018; Radford et al.,
+first pre-train the “complex”’ part (i.e., the hier-    2018). Different from the extractive models
+archical encoder) of the extractive model on unla-      above, we adopt a hierarchical Transformer for
+beled data and then we learn to classify sentences      document encoding and also propose a method to
+with our model initialized from the pre-trained en-     pre-train the document encoder.
+coder. In this paper, we propose H IBERT, which
+stands for HIerachical Bidirectional Encoder            Abstractive Summarization Abstractive sum-
+Representations from Transformers. We design            marization aims to generate the summary of a
+an unsupervised method to pre-train H IBERT for         document with rewriting. Most recent abstractive
+document modeling. We apply the pre-trained             models (Nallapati et al., 2016) are based on neural
+H IBERT to the task of document summarization           sequence to sequence learning (Bahdanau et al.,
+and achieve state-of-the-art performance on both        2015; Sutskever et al., 2014). However, the gen-
+the CNN/Dailymail and New York Times dataset.           erated summaries of these models can not be con-
+                                                        trolled (i.e., their meanings can be quite different
+2   Related Work                                        from the original and contents can be repeated).
+In this section, we introduce work on extractive        Therefore, copy mechanism (Gu et al., 2016), cov-
+summarization, abstractive summarization and            erage model (See et al., 2017) and reinforcement
+pre-trained natural language processing models.         learning model optimizing ROUGE (Paulus et al.,
+For a more comprehensive review of summariza-           2017) are introduced. These problems are allevi-
+tion, we refer the interested readers to Nenkova        ated but not solved. There is also an interesting
+and McKeown (2011) and Mani (2001).                     line of work combining extractive and abstractive
+                                                        summarization with reinforcement learning (Chen
+Extractive Summarization Extractive summa-              and Bansal, 2018), fused attention (Hsu et al.,
+rization aims to select important sentences (some-      2018) and bottom-up attention (Gehrmann et al.,
+times other textual units such as elementary dis-       2018). Our model, which is a very good extractive
+course units (EDUs)) from a document as its sum-        model, can be used as the sentence extraction com-
+mary. It is usually modeled as a sentence rank-         ponent in these models and potentially improves
+ing problem by using the scores from classifiers        their performance.
+(Kupiec et al., 1995), sequential labeling models
+(Conroy and O’leary, 2001) as well as integer lin-      Pre-trained NLP Models Most model pre-
+ear programmers (Woodsend and Lapata, 2010).            training methods in NLP leverage the natural or-
+Early work with these models above mostly lever-        dering of text. For example, word2vec uses the
+age human engineered features such as sentence          surrounding words within a fixed size window to
+position and length (Radev et al., 2004), word fre-     predict the word in the middle with a log bilin-
+quency (Nenkova et al., 2006) and event features        ear model. The resulting word embedding table
+(Filatova and Hatzivassiloglou, 2004b).                 can be used in other downstream tasks. There are
+   As the very successful applications of neural        other word embedding pre-training methods using
+networks to a wide range of NLP tasks, the man-         similar techniques (Pennington et al., 2014; Bo-
+ually engineered features (for document encod-          janowski et al., 2017). Peters et al. (2018) and
+ing) are replaced with hierarchical LSTMs/CNNs          Radford et al. (2018) find even a sentence encoder
+                                                          To obtain the representation of D, we use two en-
+                                                          coders: a sentence encoder to transform each sen-
+                                                          tence in D to a vector and a document encoder
+                                                          to learn sentence representations given their sur-
+                                                          rounding sentences as context. Both the sentence
+                                                          encoder and document encoder are based on the
+                                                          Transformer encoder described in Vaswani et al.
+                                                          (2017). As shown in Figure 1, they are nested
+                                                          in a hierarchical fashion. A transformer encoder
+                                                          usually has multiple layers and each layer is com-
+                                                          posed of a multi-head self attentive sub-layer fol-
+                                                          lowed by a feed-forward sub-layer with residual
+                                                          connections (He et al., 2016) and layer normal-
+                                                          izations (Ba et al., 2016). For more details of the
+                                                          Transformer encoder, we refer the interested read-
+                                                          ers to Vaswani et al. (2017). To learn the repre-
+                                                          sentation of Si , Si = (w1i , w2i , . . . , w|S
+                                                                                                       i ) is first
+                                                                                                         i|
+                                                          mapped into continuous space
+Figure 1: The architecture of H IBERT during training.
+senti is a sentence in the document above, which has
+four sentences in total. sent3 is masked during encod-                        Ei = (ei1 , ei2 , . . . , ei|Si | )
+                                                                                                                    (1)
+ing and the decoder predicts the original sent3 .                          where eij = e(wji ) + pj
+
+                                                          where e(wji ) and pj are the word and positional
+(not just word embeddings) can also be pre-trained
+with language model objectives (i.e., predicting          embeddings of wji , respectively. The word embed-
+the next or previous word). Language model ob-            ding matrix is randomly initialized and we adopt
+jective is unidirectional, while many tasks can           the sine-cosine positional embedding (Vaswani
+leverage the context in both directions. Therefore,       et al., 2017)1 . Then the sentence encoder (a Trans-
+Devlin et al. (2018) propose the naturally bidi-          former) transforms Ei into a list of hidden rep-
+rectional masked language model objective (i.e.,          resentations (hi1 , hi2 , . . . , hi|Si | ). We take the last
+masking several words with a special token in             hidden representation hi|Si | (i.e., the representation
+a sentence and then predicting them). All the             at the EOS token) as the representation of sentence
+methods above aim to pre-train word embeddings            Si . Similar to the representation of each word in
+or sentence encoders, while our method aims to            Si , we also take the sentence position into account.
+pre-train the hierarchical document encoders (i.e.,       The final representation of Si is
+hierarchical transformers), which is important in
+summarization.                                                                ĥi = hi|Si | + pi                    (2)
+
+3     Model                                               Note that words and sentences share the same po-
+                                                          sitional embedding matrix.
+In this section, we present our model H IBERT. We            In analogy to the sentence encoder, as shown
+first introduce how documents are represented in          in Figure 1, the document encoder is yet another
+H IBERT. We then describe our method to pre-train         Transformer but applies on the sentence level. Af-
+H IBERT and finally move on to the application of         ter running the Transformer on a sequence of sen-
+H IBERT to summarization.                                 tence representations (ĥ1 , ĥ2 , . . . , ĥ|D| ), we ob-
+                                                          tain the context sensitive sentence representations
+3.1    Document Representation                            (d1 , d2 , . . . , d|D| ). Now we have finished the en-
+Let D = (S1 , S2 , . . . , S|D| ) denote a document,      coding of a document with a hierarchical bidirec-
+where Si = (w1i , w2i , . . . , w|S
+                                 i ) is a sentence in D
+                                    i|
+                                                          tional transformer encoder H IBERT. Note that in
+and wji a word in Si . Note that following common         previous work, document representation are also
+practice in natural language processing literatures,         1
+                                                               We use the sine-cosine embedding because it works well
+  i
+w|S    is an artificial EOS (End Of Sentence) token.      and do not introduce additional trainable parameters.
+    i|
+learned with hierarchical models, but each hier-          ample to demonstrate the transformation. For in-
+archy is a Recurrent Neural Network (Nallapati            stance, we have the following document and the
+et al., 2017; Zhou et al., 2018) or Convolutional         second sentence is selected2 :
+Neural Network (Cheng and Lapata, 2016). We               William Shakespeare is a poet .
+choose the Transformer because it outperforms             He died in 1616 . He is regarded
+CNN and RNN in machine translation (Vaswani               as the greatest writer .
+et al., 2017), semantic role labeling (Strubell et al.,      In 80% of the cases, we mask the selected
+2018) and other NLP tasks (Devlin et al., 2018).          sentence (i.e., we replace each word in the sen-
+In the next section we will introduce how we train        tence with a mask token [MASK]). The document
+H IBERT with an unsupervised training objective.          above becomes William Shakespeare is
+                                                          a poet . [MASK] [MASK] [MASK]
+3.2   Pre-training                                        [MASK] [MASK] He is regarded as
+Most recent encoding neural models used in NLP            the greatest writer .                   (where “He
+(e.g., RNNs, CNNs or Transformers) can be pre-            died in 1616 . ” is masked).
+trained by predicting a word in a sentence (or a             In 10% of the cases, we keep the selected sen-
+text span) using other words within the same sen-         tence as it is. This strategy is to simulate the input
+tence (or span). For example, ELMo (Peters et al.,        document during test time (with no masked sen-
+2018) and OpenAI-GPT (Radford et al., 2018)               tences).
+predict a word using all words on its left (or right);       In the rest 10% cases, we replace the selected
+while word2vec (Mikolov et al., 2013) predicts            sentence with a random sentence. In this case,
+one word with its surrounding words in a fixed            the document after transformation is William
+window and BERT (Devlin et al., 2018) predicts            Shakespeare is a poet . Birds
+(masked) missing words in a sentence given all the        can fly . He is regarded as the
+other words.                                              greatest writer . The second sentence
+   All the models above learn the representation          is replaced with “Birds can fly .” This
+of a sentence, where its basic units are words.           strategy intends to add some noise during training
+H IBERT aims to learn the representation of a doc-        and make the model more robust.
+ument, where its basic units are sentences. There-
+fore, a natural way of pre-training a document            Sentence Prediction After the application of
+level model (e.g., H IBERT) is to predict a sentence      the above procedures to a document D =
+(or sentences) instead of a word (or words). We           (S1 , S2 , . . . , S|D| ), we obtain the masked docu-
+could predict a sentence in a document with all the       ment D  e = (S˜1 , S˜2 , . . . , S˜|D| ). Let K denote the
+sentences on its left (or right) as in a (document        set of indicies of selected sentences in D. Now
+level) language model. However, in summariza-             we are ready to predict the masked sentences
+tion, context on both directions are available. We        M = {Sk |k ∈ K} using D.                 e We first apply
+therefore opt to predict a sentence using all sen-        the hierarchical encoder H IBERT in Section 3.1 to
+tences on both its left and right.                        De and obtain its context sensitive sentence rep-
+                                                          resentations (d˜1 , d˜2 , . . . , d˜|D| ). We will demon-
+Document Masking Specifically, suppose D =                strate how we predict the masked sentence Sk =
+(S1 , S2 , . . . , S|D| ) is a document, where Si =       (w0k , w1k , w2k , . . . , w|S
+                                                                                      k ) one word per step (w k is
+                                                                                        k|                       0
+(w1i , w2i , . . . , w|S
+                      i ) is a sentence in it. We ran-
+                        i|                                an artificially added BOS token). At the jth step,
+domly select 15% of the sentences in D and mask           we predict wjk given w0k , . . . , wj−1   k      e d˜k al-
+                                                                                                       and D.
+them. Then, we predict these masked sentences.
+                                                          ready encodes the information of D          e with a focus
+The prediction task here is similar with the Cloze                                         ˜
+                                                          around its kth sentence Sk . As shown in Figure 1,
+task (Taylor, 1953; Devlin et al., 2018), but the
+                                                          we employ a Transformer decoder (Vaswani et al.,
+missing part is a sentence. However, during test
+                                                          2017) to predict wjk with d˜k as its additional input.
+time the input document is not masked, to make
+                                                          The transformer decoder we used here is slightly
+our model can adapt to documents without masks,
+                                                          different from the original one. The original de-
+we do not always mask the selected sentences.
+                                                          coder employs two multi-head attention layers to
+Once a sentence is selected (as one of the 15%
+selected masked sentences), we transform it with            2
+                                                              There might be multiple sentences selected in a docu-
+one of three methods below. We will use an ex-            ment, but in this example there is only one.
+include both the context in encoder and decoder,
+while we only need one to learn the decoder con-
+text, since the context in encoder is a vector (i.e.,
+d˜k ). Specifically, after applying the word and po-
+sitional embeddings to (w0k , . . . , wj−1
+                                       k ), we obtain
+
+ek
+E 1:j−1  = (e˜k , . . . , ek˜ ) (also see Equation 1).
+                 0         j−1
+Then we apply multi-head attention sub-layer to
+ek
+E 1:j−1 :
+      ˜ = MultiHead(qj−1 , Kj−1 , Vj−1 )
+    hj−1
+    q j−1= WQ ek˜        j−1
+                                                        (3)
+                   ekK
+   Kj−1       =W E  1:j−1
+                 V ek
+   Kj−1       = W E1:j−1
+where qj−1 , Kj−1 , Vj−1 are the input query,                 Figure 2: The architecture of our extractive summa-
+key and value matrices of the multi-head attention            rization model. The sentence and document level trans-
+function (Vaswani et al., 2017) MultiHead(·, ·, ·),           formers can be pretrained.
+respectively. WQ ∈ Rd×d , WK ∈ Rd×d and
+WV ∈ Rd×d are weight matrices.                                3.3    Extractive Summarization
+   Then we include the information of De by addi-
+tion:                                                         Extractive summarization selects the most impor-
+                ˜ = hj−1
+               xj−1       ˜ + d˜k              (4)            tant sentences in a document as its summary. In
+                                                              this section, summarization is modeled as a se-
+We also follow a feedforward sub-layer (one hid-              quence labeling problem. Specifically, a docu-
+den layer with ReLU (Glorot et al., 2011) acti-               ment is viewed as a sequence of sentences and
+                        ˜ as in Vaswani et al.
+vation function) after xj−1                                   a summarization model is expected to assign a
+(2017):                                                       True or False label for each sentence, where
+  ˜ = W2f f max(0, W1f f xj−1
+ gj−1                     ˜ + b1 ) + b2 (5)                   True means this sentence should be included in
+                                                              the summary. In the following, we will intro-
+Note that the transformer decoder can have multi-
+                                                              duce the details of our summarization model based
+ple layers by applying Equation (3) to (5) multiple
+                                                              H IBERT.
+times and we only show the computation of one
+                                                                 Let D = (S1 , S2 , . . . , S|D| ) denote a docu-
+layer for simplicity.
+                                                              ment and Y = (y1 , y2 , . . . , y|D| ) its sentence
+   The probability of wjk given w0k , . . . , wj−1
+                                               k   and
+                                                              labels (methods for obtaining these labels are
+D is:
+ e
+                                                              in Section 4.1). As shown in Figure 2, we
+    p(wk |wk
+          j
+                   e = softmax(WO gj−1
+                 , D)
+               0:j−1                         ˜ ) (6)          first apply the hierarchical bidirectional trans-
+Finally the probability of all masked sentences M             former encoder H IBERT to D and yields the con-
+given De is                                                   text dependent representations for all sentences
+                                                              (d1 , d2 , . . . , d|D| ). The probability of the label of
+                         Y |S
+                           Y k|
+                                                              Si can be estimated using an additional linear pro-
+      p(M|D)
+          e =                      p(wjk |w0:j−1
+                                           k
+                                                 , D)
+                                                   e    (7)   jection and a softmax:
+                         k∈K j=1
+
+The model above can be trained by minimizing the                          p(yi |D) = softmax(WS di )                (8)
+negative log-likelihood of all masked sentences
+given their paired documents. We can in the-                  where WS ∈ R2×d . The summarization model
+ory have unlimited amount of training data for                can be trained by minimizing the negative log-
+H IBERT, since they can be generated automati-                likelihood of all sentence labels given their paired
+cally from (unlabeled) documents. Therefore, we               documents.
+can first train H IBERT on large amount of data and
+                                                              4     Experiments
+then apply it to downstream tasks. In the next sec-
+tion, we will introduce its application to document           In this section we assess the performance of our
+summarization.                                                model on the document summarization task. We
+first introduce the dataset we used for pre-training    4.2   Implementation Details
+and the summarization task and give implementa-
+                                                        Our model is trained in three stages, which in-
+tion details of our model. We also compare our
+                                                        cludes two pre-training stages and one finetuning
+model against multiple previous models.
+                                                        stage. The first stage is the open-domain pre-
+4.1    Datasets                                         training and in this stage we train H IBERT with the
+                                                        pre-training objective (Section 3.2) on GIGA-CM
+We conducted our summarization experiments
+                                                        dataset. In the second stage, we perform the in-
+on the non-anonymous version CNN/Dailymail
+                                                        domain pre-training on the CNNDM (or NYT50)
+(CNNDM) dataset (Hermann et al., 2015; See
+                                                        dataset still with the same pre-training objective.
+et al., 2017), and the New York Times dataset
+                                                        In the final stage, we finetune H IBERT in the sum-
+(Durrett et al., 2016; Xu and Durrett, 2019). For
+                                                        marization model (Section 3.3) to predict extrac-
+the CNNDM dataset, we preprocessed the dataset
+                                                        tive sentence labels on CNNDM (or NYT50).
+using the scripts from the authors of See et al.
+                                                           The sizes of the sentence and document level
+(2017)3 . The resulting dataset contains 287,226
+                                                        Transformers as well as the Transformer decoder
+documents with summaries for training, 13,368
+                                                        in H IBERT are the same. Let L denote the num-
+for validation and 11,490 for test. Following (Xu
+                                                        ber of layers in Transformer, H the hidden size
+and Durrett, 2019; Durrett et al., 2016), we cre-
+                                                        and A the number of attention heads. As in
+ated the NYT50 dataset by removing the docu-
+                                                        (Vaswani et al., 2017; Devlin et al., 2018), the hid-
+ments whose summaries are shorter than 50 words
+                                                        den size of the feedforward sublayer is 4H. We
+from New York Times dataset. We used the same
+                                                        mainly trained two model sizes: H IBERTS (L = 6,
+training/validation/test splits as in Xu and Dur-
+                                                        H = 512 and A = 8) and H IBERTM (L = 6,
+rett (2019), which contain 137,778 documents for
+                                                        H = 768 and A = 12). We trained both H IBERTS
+training, 17,222 for validation and 17,223 for test.
+                                                        and H IBERTM on a single machine with 8 Nvidia
+To create sentence level labels for extractive sum-
+                                                        Tesla V100 GPUs with a batch size of 256 doc-
+marization, we used a strategy similar to Nallapati
+                                                        uments. We optimized our models using Adam
+et al. (2017). We label the subset of sentences in
+                                                        with learning rate of 1e-4, β1 = 0.9, β2 = 0.999,
+a document that maximizes ROUGE (Lin, 2004)
+                                                        L2 norm of 0.01, learning rate warmup 10,000
+(against the human summary) as True and all
+                                                        steps and learning rate decay afterwards using the
+other sentences as False.
+                                                        strategies in Vaswani et al. (2017). The dropout
+   To unsupervisedly pre-train our document
+                                                        rate in all layers are 0.1. In pre-training stages,
+model H IBERT (see Section 3.2 for details), we
+                                                        we trained our models until validation perplexities
+created the GIGA-CM dataset (totally 6,626,842
+                                                        do not decrease significantly (around 45 epochs on
+documents and 2,854 million words), which in-
+                                                        GIGA-CM dataset and 100 to 200 epochs on CN-
+cludes 6,339,616 documents sampled from the En-
+                                                        NDM and NYT50). Training H IBERTM for one
+glish Gigaword4 dataset and the training split of
+                                                        epoch on GIGA-CM dataset takes approximately
+the CNNDM dataset. We used the validation set
+                                                        20 hours.
+of CNNDM as the validation set of GIGA-CM
+as well. As in See et al. (2017), documents and            Our models during fine-tuning stage can be
+summaries in CNNDM, NYT50 and GIGA-CM                   trained on a single GPU. The hyper-parameters are
+are all segmented and tokenized using Stanford          almost identical to these in the pre-training stages
+CoreNLP toolkit (Manning et al., 2014). To re-          except that the learning rate is 5e-5, the batch size
+duce the vocabulary size, we applied byte pair en-      is 32, the warmup steps are 4,000 and we train our
+coding (BPE; Sennrich et al. 2016) to all of our        models for 5 epochs. During inference, we rank
+datasets. To limit the memory consumption dur-          sentences using p(yi |D) (Equation (8)) and choose
+ing training, we limit the length of each sentence      the top K sentences as summary, where K is tuned
+to be 50 words (51th word and onwards are re-           on the validation set.
+moved) and split documents with more than 30
+                                                        4.3   Evaluations
+sentences into smaller documents with each con-
+taining at most 30 sentences.                           We evaluated the quality of summaries from dif-
+   3                                                    ferent systems automatically using ROUGE (Lin,
+    Scripts publicly available at https://github.com/
+abisee/cnn-dailymail                                    2004). We reported the full length F1 based
+  4
+    https://catalog.ldc.upenn.edu/LDC2012T21            ROUGE-1, ROUGE-2 and ROUGE-L on the
+  Model                     R-1     R-2      R-L        (Hsu et al., 2018) and InconsisLoss (Chen and
+  Pointer+Coverage         39.53   17.28    36.38       Bansal, 2018) all try to decompose the word by
+  Abstract-ML+RL           39.87   15.82    36.90       word summary generation into sentence selection
+  DCA                      41.69   19.47    37.92       from document and “sentence” level summariza-
+  SentRewrite              40.88   17.80    38.54       tion (or compression). Bottom-Up (Gehrmann
+  InconsisLoss             40.68   17.97    37.13       et al., 2018) generates summaries by combines a
+  Bottom-Up                41.22   18.68    38.34       word prediction model with the decoder attention
+  Lead3                    40.34   17.70    36.57       model. The extractive models are usually based
+  SummaRuNNer              39.60   16.20    35.30       on hierarchical encoders (SummaRuNNer; Nalla-
+  NeuSum                   40.11   17.52    36.39       pati et al. 2017 and NeuSum; Cheng and Lapata
+  Refresh                  40.00   18.20    36.60       2016). They have been extended with reinforce-
+  NeuSum-MMR               41.59   19.01    37.98       ment learning (Refresh; Narayan et al. 2018 and
+  BanditSum                41.50   18.70    37.60       BanditSum; Dong et al. 2018), Maximal Marginal
+  JECS                     41.70   18.50    37.90       Relevance (NeuSum-MMR; Zhou et al. 2018), la-
+  LatentSum                41.05   18.77    37.54       tent variable modeling (LatentSum; Zhang et al.
+  HierTransformer          41.11   18.69    37.53       2018) and syntactic compression (JECS; Xu and
+  BERT                     41.82   19.48    38.30       Durrett 2019). Lead3 is a baseline which sim-
+  H IBERTS (in-domain)     42.10   19.70    38.53       ply selects the first three sentences. Our model
+  H IBERTS                 42.31   19.87    38.78       H IBERTS (in-domain), which only use one pre-
+  H IBERTM                 42.37   19.95    38.83       training stage on the in-domain CNNDM training
+                                                        set, outperforms all of them and differences be-
+Table 1: Results of various models on the CNNDM test    tween them are all significant with a 0.95 confi-
+set using full-length F1 ROUGE -1 (R-1), ROUGE -2 (R-   dence interval (estimated with the ROUGE script).
+2), and ROUGE -L (R-L).                                 Note that pre-training H IBERTS (in-domain) is
+                                                        very fast and it only takes around 30 minutes
+                                                        for one epoch on the CNNDM training set. Our
+CNNDM and NYT50 datasets. We compute
+                                                        models with two pre-training stages (H IBERTS ) or
+ROUGE scores using the ROUGE-1.5.5.pl
+                                                        larger size (H IBERTM ) perform even better and
+script.
+                                                        H IBERTM outperforms BERT by 0.5 ROUGE5 .
+   Additionally, we also evaluated the generated
+                                                        We also implemented two baselines. One is
+summaries by eliciting human judgments. Fol-
+                                                        the hierarchical transformer summarization model
+lowing (Cheng and Lapata, 2016; Narayan et al.,
+                                                        (HeriTransfomer; described in 3.3) without pre-
+2018), we randomly sampled 20 documents from
+                                                        training. Note the setting for HeriTransfomer is
+the CNNDM test set. Participants were presented
+                                                        (L = 4,H = 300 and A = 4) 6 . We can see
+with a document and a list of summaries produced
+                                                        that the pre-training (details in Section 3.2) leads
+by different systems. We asked subjects to rank
+                                                        to a +1.25 ROUGE improvement. Another base-
+these summaries (ties allowed) by taking informa-
+                                                        line is based on a pre-trained BERT (Devlin et al.,
+tiveness (is the summary capture the important in-
+                                                        2018)7 and finetuned on the CNNDM dataset. We
+formation from the document?) and fluency (is the
+                                                        used the BERTbase model because our 16G RAM
+summary grammatical?) into account. Each docu-
+                                                        V100 GPU cannot fit BERTlarge for the summa-
+ment is annotated by three different subjects.
+                                                        rization task even with batch size of 1. The posi-
+                                                        tional embedding of BERT supports input length
+4.4   Results
+                                                        up to 512 words, we therefore split documents
+Our main results on the CNNDM dataset are               with more than 10 sentences into multiple blocks
+shown in Table 1, with abstractive models in
+the top block and extractive models in the bot-
+                                                           5
+tom block. Pointer+Coverage (See et al., 2017),               The difference is significant according to the ROUGE
+                                                        script.
+Abstract-ML+RL (Paulus et al., 2017) and DCA                6
+                                                              We tried deeper and larger models, but obtained inferior
+(Celikyilmaz et al., 2018) are all sequence to se-      results, which may indicates training large or deep models on
+quence learning based models with copy and cov-         this dataset without a good initialization is challenging.
+                                                            7
+                                                              Our BERT baseline is adapted from this imple-
+erage modeling, reinforcement learning and deep         mentation       https://github.com/huggingface/
+communicating agents extensions. SentRewrite            pytorch-pretrained-BERT
+  Models                       R-1       R-2       R-L         Models      1st   2nd    3rd    4th    5th    6th MeanR
+                                                               Lead3      0.03   0.18   0.15   0.30   0.30   0.03 3.75
+  Lead                        41.80     22.60     35.00        DCA        0.08   0.15   0.18   0.20   0.15   0.23 3.88
+  EXTRACTION                  44.30     25.50     37.10        Latent     0.05   0.33   0.28   0.20   0.13   0.00 3.03
+  JECS                        45.50     25.30     38.20        BERT       0.13   0.37   0.32   0.15   0.03   0.00 2.58
+                                                               H IBERTM   0.30   0.35   0.25   0.10   0.00   0.00 2.15
+  HeriTransformer             47.44     28.08     39.56        Human      0.58   0.15   0.20   0.00   0.03   0.03 1.85
+  BERT                        48.38     29.04     40.53
+  H IBERTS (in-domain)        48.92     29.58     41.10       Table 4: Human evaluation: proportions of rankings
+  H IBERTM (in-domain)        49.06     29.70     41.23       and mean ranks (MeanR; lower is better) of various
+                                                              models.
+  H IBERTS                    49.25     29.92     41.43
+  H IBERTM                    49.47     30.11     41.63
+                                                              the outputs of these systems from best to worst.
+Table 2: Results of various models on the NYT50
+test set using full-length F1 ROUGE. H IBERTS (in-            As shown in Table 4, the output of H IBERTM is
+domain) and H IBERTM (in-domain) only uses one pre-           selected as the best in 30% of cases and we ob-
+training stage on the NYT50 training set.                     tained lower mean rank than all systems except for
+                                                              Human. We also converted the rank numbers into
+  Pretraining Strategies      R-1       R-2       R-L         ratings (rank i to 7 − i) and applied student t-test
+  Open-Domain                42.97     20.31     39.51        on the ratings. H IBERTM is significantly different
+  In-Domain                  42.93     20.28     39.46        from all systems in comparison (p < 0.05), which
+  Open+In-Domain             43.19     20.46     39.72        indicates our model still lags behind Human, but
+                                                              is better than all other systems.
+Table 3: Results of summarization model (H IBERTS
+setting) with different pre-training strategies on the        Pre-training Strategies As mentioned earlier,
+CNNDM validation set using full-length F1 ROUGE.              our pre-training includes two stages. The first
+                                                              stage is the open-domain pre-training stage on
+(each block with 10 sentences8 ). We feed each                the GIGA-CM dataset and the following stage
+block (the BOS and EOS tokens of each sentence                is the in-domain pre-training on the CNNDM
+are replaced with [CLS] and [SEP] tokens) into                (or NYT50) dataset. As shown in Table 3,
+BERT and use the representation at [CLS] token                we pretrained H IBERTS using only open-domain
+to classify each sentence. Our model H IBERTS                 stage (Open-Domain), only in-domain stage (In-
+outperforms BERT by 0.4 to 0.5 ROUGE despite                  Domain) or both stages (Open+In-Domain) and
+with only half the number of model parameters                 applied it to the CNNDM summarization task. Re-
+(H IBERTS 54.6M v.s. BERT 110M).                              sults on the validation set of CNNDM indicate the
+   Results on the NYT50 dataset show the similar              two-stage pre-training process is necessary.
+trends (see Table 2). EXTRACTION is a extrac-
+tive model based hierarchical LSTM and we use                 5   Conclusions
+the numbers reported by Xu and Durrett (2019).
+                                                              The core part of a neural extractive summariza-
+The improvement of H IBERTM over the baseline
+                                                              tion model is the hierarchical document encoder.
+without pre-training (HeriTransformer) becomes
+                                                              We proposed a method to pre-train document level
+2.0 ROUGE. H IBERTS (in-domain), H IBERTM
+                                                              hierarchical bidirectional transformer encoders on
+(in-domain), H IBERTS and H IBERTM all outper-
+                                                              unlabeled data. When we only pre-train hierar-
+form BERT significantly according to the ROUGE
+                                                              chical transformers on the training sets of summa-
+script.
+                                                              rization datasets with our proposed objective, ap-
+   We also conducted human experiment with 20
+                                                              plication of the pre-trained hierarchical transform-
+randomly sampled documents from the CNNDM
+                                                              ers to extractive summarization models already
+test set. We compared our model H IBERTM
+                                                              leads to wide improvement of summarization per-
+against Lead3, DCA, Latent, BERT and the human
+                                                              formance. Adding the large open-domain dataset
+reference (Human)9 . We asked the subjects to rank
+                                                              to pre-training leads to even better performance.
+   8
+     We use 10 sentences per block, because maximum sen-      In the future, we plan to apply models to other
+tence length 50 × 10 < 512 (maximum BERT supported            tasks that also require hierarchical document en-
+length). The last block of a document may have less than 10
+sentences.                                                    codings (e.g., document question answering). We
+   9
+     We obtained the outputs of DCA and Latent via emails.    are also interested in improving the architectures
+of hierarchical document encoders and designing             pages 3739–3748. Association for Computational
+other objectives to train hierarchical transformers.        Linguistics.
+
+                                                          Greg Durrett, Taylor Berg-Kirkpatrick, and Dan Klein.
+                                                            2016. Learning-based single-document summariza-
+References                                                  tion with compression and anaphoricity constraints.
+Jimmy Lei Ba, Jamie Ryan Kiros, and Geoffrey E Hin-         In Proceedings of the 54th Annual Meeting of the
+   ton. 2016. Layer normalization. arXiv preprint           Association for Computational Linguistics (Volume
+   arXiv:1607.06450.                                        1: Long Papers), pages 1998–2008. Association for
+                                                            Computational Linguistics.
+Dzmitry Bahdanau, Kyunghyun Cho, and Yoshua Ben-
+  gio. 2015. Neural machine translation by jointly        Elena Filatova and Vasileios Hatzivassiloglou. 2004a.
+  learning to align and translate. In In Proceedings of     Event-based extractive summarization. In Text Sum-
+  the 3rd International Conference on Learning Rep-         marization Branches Out: Proceedings of the ACL-
+  resentations, San Diego, California.                      04 Workshop, pages 104–111, Barcelona, Spain.
+
+Piotr Bojanowski, Edouard Grave, Armand Joulin, and       Elena Filatova and Vasileios Hatzivassiloglou. 2004b.
+   Tomas Mikolov. 2017. Enriching word vectors with         Event-based extractive summarization.
+   subword information. Transactions of the Associa-
+   tion for Computational Linguistics, 5:135–146.         Sebastian Gehrmann, Yuntian Deng, and Alexander
+                                                            Rush. 2018. Bottom-up abstractive summarization.
+Asli Celikyilmaz, Antoine Bosselut, Xiaodong He, and        In Proceedings of the 2018 Conference on Empiri-
+  Yejin Choi. 2018. Deep communicating agents for           cal Methods in Natural Language Processing, pages
+  abstractive summarization. In Proceedings of the          4098–4109. Association for Computational Linguis-
+  2018 Conference of the North American Chapter of          tics.
+  the Association for Computational Linguistics: Hu-
+  man Language Technologies, Volume 1 (Long Pa-           Xavier Glorot, Antoine Bordes, and Yoshua Bengio.
+  pers), pages 1662–1675, New Orleans, Louisiana.           2011. Deep sparse rectifier neural networks. In Pro-
+                                                            ceedings of the fourteenth international conference
+Xiuying Chen, Shen Gao, Chongyang Tao, Yan Song,            on artificial intelligence and statistics, pages 315–
+  Dongyan Zhao, and Rui Yan. 2018. Iterative docu-          323.
+  ment representation learning towards summarization
+  with polishing. In Proceedings of the 2018 Con-         Jiatao Gu, Zhengdong Lu, Hang Li, and Victor O.K.
+  ference on Empirical Methods in Natural Language           Li. 2016. Incorporating copying mechanism in
+  Processing, pages 4088–4097. Association for Com-          sequence-to-sequence learning. In Proceedings of
+  putational Linguistics.                                    the 54th Annual Meeting of the Association for Com-
+                                                             putational Linguistics (Volume 1: Long Papers),
+Yen-Chun Chen and Mohit Bansal. 2018. Fast abstrac-          pages 1631–1640. Association for Computational
+  tive summarization with reinforce-selected sentence        Linguistics.
+  rewriting. In Proceedings of the 56th Annual Meet-
+  ing of the Association for Computational Linguistics    Kaiming He, Xiangyu Zhang, Shaoqing Ren, and Jian
+  (Volume 1: Long Papers), pages 675–686. Associa-          Sun. 2016. Deep residual learning for image recog-
+  tion for Computational Linguistics.                       nition. In Proceedings of the IEEE conference on
+Jianpeng Cheng and Mirella Lapata. 2016. Neural             computer vision and pattern recognition, pages 770–
+   summarization by extracting sentences and words.         778.
+   In Proceedings of the 54th Annual Meeting of the
+                                                          Karl Moritz Hermann, Tomas Kocisky, Edward
+   Association for Computational Linguistics (Volume
+                                                            Grefenstette, Lasse Espeholt, Will Kay, Mustafa Su-
+   1: Long Papers), pages 484–494, Berlin, Germany.
+                                                            leyman, and Phil Blunsom. 2015. Teaching ma-
+John M Conroy and Dianne P O’leary. 2001. Text sum-         chines to read and comprehend. In Advances in Neu-
+  marization via hidden markov models. In Proceed-          ral Information Processing Systems, pages 1693–
+  ings of the 24th annual international ACM SIGIR           1701. Curran Associates, Inc.
+  conference on Research and development in infor-
+  mation retrieval, pages 406–407. ACM.                   Sepp Hochreiter and Jürgen Schmidhuber. 1997.
+                                                            Long short-term memory. Neural computation,
+Jacob Devlin, Ming-Wei Chang, Kenton Lee, and               9(8):1735–1780.
+   Kristina Toutanova. 2018. BERT: Pre-training of
+   Deep Bidirectional Transformers for Language Un-       Wan-Ting Hsu, Chieh-Kai Lin, Ming-Ying Lee, Kerui
+   derstanding. arXiv preprint arXiv:1810.04805.            Min, Jing Tang, and Min Sun. 2018. A unified
+                                                            model for extractive and abstractive summarization
+Yue Dong, Yikang Shen, Eric Crawford, Herke van             using inconsistency loss. In Proceedings of the 56th
+  Hoof, and Jackie Chi Kit Cheung. 2018. Bandit-            Annual Meeting of the Association for Computa-
+  sum: Extractive summarization as a contextual ban-        tional Linguistics (Volume 1: Long Papers), pages
+  dit. In Proceedings of the 2018 Conference on Em-         132–141. Association for Computational Linguis-
+  pirical Methods in Natural Language Processing,           tics.
+Julian Kupiec, Jan Pedersen, and Francine Chen. 1995.       representation. In Proceedings of the 2014 confer-
+   A trainable document summarizer. In Proceedings          ence on empirical methods in natural language pro-
+   of the 18th annual international ACM SIGIR confer-       cessing (EMNLP), pages 1532–1543.
+   ence on Research and development in information
+   retrieval, pages 68–73. ACM.                           Matthew Peters, Mark Neumann, Mohit Iyyer, Matt
+                                                           Gardner, Christopher Clark, Kenton Lee, and Luke
+Chin-Yew Lin. 2004. Rouge: A package for automatic         Zettlemoyer. 2018. Deep contextualized word repre-
+  evaluation of summaries. In Text Summarization           sentations. In Proceedings of the 2018 Conference
+  Branches Out: Proceedings of the ACL-04 Work-            of the North American Chapter of the Association
+  shop, pages 74–81, Barcelona, Spain.                     for Computational Linguistics: Human Language
+                                                           Technologies, Volume 1 (Long Papers), pages 2227–
+Inderjeet Mani. 2001. Automatic Summarization. John        2237. Association for Computational Linguistics.
+   Benjamins Pub Co.
+                                                          Dragomir Radev, Timothy Allison, Sasha Blair-
+Christopher Manning, Mihai Surdeanu, John Bauer,            Goldensohn, John Blitzer, Arda Çelebi, Stanko
+  Jenny Finkel, Steven Bethard, and David McClosky.         Dimitrov, Elliott Drabek, Ali Hakim, Wai Lam,
+  2014. The stanford corenlp natural language pro-          Danyu Liu, Jahna Otterbacher, Hong Qi, Horacio
+  cessing toolkit. In Proceedings of 52nd annual            Saggion, Simone Teufel, Michael Topper, Adam
+  meeting of the association for computational lin-         Winkel, and Zhu Zhang. 2004. Mead - a plat-
+  guistics: system demonstrations, pages 55–60.             form for multidocument multilingual text summa-
+                                                            rization. In Proceedings of the Fourth International
+Tomas Mikolov, Ilya Sutskever, Kai Chen, Greg S Cor-        Conference on Language Resources and Evaluation
+  rado, and Jeff Dean. 2013. Distributed representa-        (LREC’04). European Language Resources Associ-
+  tions of words and phrases and their compositional-       ation (ELRA).
+  ity. In Advances in neural information processing
+  systems, pages 3111–3119.                               Alec Radford, Karthik Narasimhan, Tim Salimans, and
+                                                            Ilya Sutskever. 2018. Improving language under-
+Ramesh Nallapati, Feifei Zhai, and Bowen Zhou. 2017.        standing by generative pre-training. URL https://s3-
+  Summarunner: A recurrent neural network based se-         us-west-2. amazonaws. com/openai-assets/research-
+  quence model for extractive summarization of doc-         covers/languageunsupervised/language         under-
+  uments. In In Proceedings of the 31st AAAI Con-           standing paper. pdf.
+  ference on Artificial Intelligence, pages 3075–3091,
+  San Francisco, California.                              Abigail See, Peter J. Liu, and Christopher D. Manning.
+                                                            2017. Get to the point: Summarization with pointer-
+Ramesh Nallapati, Bowen Zhou, Caglar Gulcehre,              generator networks. In Proceedings of the 55th An-
+  Bing Xiang, et al. 2016. Abstractive text summa-          nual Meeting of the Association for Computational
+  rization using sequence-to-sequence rnns and be-          Linguistics (Volume 1: Long Papers), pages 1073–
+  yond. arXiv preprint arXiv:1602.06023.                    1083, Vancouver, Canada.
+Shashi Narayan, Shay B. Cohen, and Mirella Lapata.        Rico Sennrich, Barry Haddow, and Alexandra Birch.
+  2018. Ranking sentences for extractive summariza-         2016. Neural machine translation of rare words
+  tion with reinforcement learning. In Proceedings of       with subword units. In Proceedings of the 54th An-
+  the 2018 Conference of the North American Chap-           nual Meeting of the Association for Computational
+  ter of the Association for Computational Linguistics:     Linguistics (Volume 1: Long Papers), pages 1715–
+  Human Language Technologies, Volume 1 (Long Pa-           1725. Association for Computational Linguistics.
+  pers), pages 1747–1759, New Orleans, Louisiana.
+                                                          Emma Strubell, Patrick Verga, Daniel Andor,
+Ani Nenkova and Kathleen McKeown. 2011. Auto-               David Weiss, and Andrew McCallum. 2018.
+  matic summarization. Foundations and Trends in            Linguistically-informed self-attention for semantic
+  Information Retrieval, 5(2–3):103–233.                    role labeling. In Proceedings of the 2018 Confer-
+                                                            ence on Empirical Methods in Natural Language
+Ani Nenkova, Lucy Vanderwende, and Kathleen McK-            Processing, pages 5027–5038. Association for
+  eown. 2006. A compositional context sensitive             Computational Linguistics.
+  multi-document summarizer: exploring the factors
+  that influence summarization. In Proceedings of         Ilya Sutskever, Oriol Vinyals, and Quoc V Le. 2014.
+  the 29th annual international ACM SIGIR confer-            Sequence to sequence learning with neural net-
+  ence on Research and development in information            works. In Advances in neural information process-
+  retrieval, pages 573–580. ACM.                             ing systems, pages 3104–3112.
+
+Romain Paulus, Caiming Xiong, and Richard Socher.         Wilson L Taylor. 1953. cloze procedure: A new
+  2017. A deep reinforced model for abstractive sum-        tool for measuring readability. Journalism Bulletin,
+  marization. arXiv preprint arXiv:1705.04304.              30(4):415–433.
+
+Jeffrey Pennington, Richard Socher, and Christopher       Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob
+   Manning. 2014. Glove: Global vectors for word            Uszkoreit, Llion Jones, Aidan N Gomez, Łukasz
+  Kaiser, and Illia Polosukhin. 2017. Attention is all
+  you need. In Advances in Neural Information Pro-
+  cessing Systems, pages 5998–6008.
+Kristian Woodsend and Mirella Lapata. 2010. Auto-
+  matic generation of story highlights. In Proceed-
+  ings of the 48th Annual Meeting of the Association
+  for Computational Linguistics, pages 565–574, Up-
+  psala, Sweden.
+Jiacheng Xu and Greg Durrett. 2019. Neural extrac-
+   tive text summarization with syntactic compression.
+   arXiv preprint arXiv:1902.00863.
+Xingxing Zhang, Mirella Lapata, Furu Wei, and Ming
+  Zhou. 2018. Neural latent extractive document sum-
+  marization. In Proceedings of the 2018 Conference
+  on Empirical Methods in Natural Language Pro-
+  cessing, pages 779–784. Association for Computa-
+  tional Linguistics.
+Qingyu Zhou, Nan Yang, Furu Wei, Shaohan Huang,
+  Ming Zhou, and Tiejun Zhao. 2018. Neural docu-
+  ment summarization by jointly learning to score and
+  select sentences. In Proceedings of the 56th Annual
+  Meeting of the Association for Computational Lin-
+  guistics (Volume 1: Long Papers), pages 654–663.
+  Association for Computational Linguistics.
+
